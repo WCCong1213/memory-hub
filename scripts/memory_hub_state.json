@@ -1,9 +1,12 @@
 {
-  "ClaudeCode_processed": [
-    "132d5a2a-b6e9-42fb-94fd-466553cbad4f.jsonl"
-  ],
-  "processed_files": [
-    "132d5a2a-b6e9-42fb-94fd-466553cbad4f.jsonl"
-  ],
-  "processed_count": 1
+  "last_batch": "2026-08-18",
+  "batch_summary": "全量批量提炼（4Agent并行）：ClaudeCode 39篇+Codex 1篇+ZCode非CPA 3篇+已过滤31个",
+  "processed_ais": [
+    "ZCode",
+    "ClaudeCode",
+    "Doubao",
+    "Codex",
+    "WPSAI",
+    "MiniMax"
+  ]
 }
