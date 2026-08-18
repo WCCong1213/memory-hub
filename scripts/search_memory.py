@@ -1,8 +1,37 @@
 # -*- coding: utf-8 -*-
 """记忆搜索：关键词搜索记忆库（项目库+能力库+AI记忆+捕捉箱）
-用法：python search_memory.py "关键词" [--ai AI名] [--limit N]
+用法：python search_memory.py "关键词" [--ai AI名] [--limit N] [--record-use "经验卡标识"]
+--record-use：记录一条经验卡被引用（应用闭环：引用计数+最近使用时间）
 """
-import argparse, json, os, glob, sys
+import argparse, json, os, glob, sys, datetime
+
+STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'memory_hub_state.json')
+
+def load_state():
+    if os.path.exists(STATE_FILE):
+        return json.load(open(STATE_FILE, encoding='utf-8'))
+    return {}
+
+def save_state(st):
+    with open(STATE_FILE, 'w', encoding='utf-8') as f:
+        json.dump(st, f, ensure_ascii=False, indent=2)
+
+def record_use(card_id):
+    """记录经验卡被引用：引用次数+1、最近使用日期。用法：AI执行任务引用经验卡后调用"""
+    st = load_state()
+    usage = st.setdefault('experience_usage', {})
+    today = datetime.date.today().isoformat()
+    u = usage.get(card_id, {'uses': 0})
+    u['uses'] = u.get('uses', 0) + 1
+    u['last_used'] = today
+    usage[card_id] = u
+    st['experience_usage'] = usage
+    save_state(st)
+    return u['uses']
+
+def usage_summary():
+    """返回使用统计（供搜索时展示经验卡验证状态）"""
+    return load_state().get('experience_usage', {})
 
 def load_cfg():
     d = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -40,13 +69,18 @@ def search(root, kw, limit):
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
-    p.add_argument('kw')
+    p.add_argument('kw', nargs='?', default='')
     p.add_argument('--limit', type=int, default=15)
     p.add_argument('--full', action='store_true', help='输出全部命中行')
+    p.add_argument('--record-use', metavar='经验卡标识', help='记录经验卡被引用（如"审计实务方法/问题链1"）')
     a = p.parse_args()
+    if a.record_use:
+        n = record_use(a.record_use)
+        print(f'✅ 已记录引用：{a.record_use}（累计引用 {n} 次）')
+        sys.exit(0)
     cfg = load_cfg()
     hits = search(cfg['memory_root'], a.kw, a.limit)
-    full = '--full' in sys.argv
+    full = a.full
     print(f'搜索「{a.kw}」：')
     # 优先展示经验总索引命中（10秒定位，省token）
     idx_path = os.path.join(cfg['memory_root'], '能力经验库', '📋 经验总索引.md')
@@ -57,6 +91,16 @@ if __name__ == '__main__':
             if a.kw in line and line.startswith('|'):
                 print(f'  [🎯索引] {line.strip()[:110]}')
                 shown += 1
+    # 展示命中经验卡的验证状态（应用闭环：引用次数+最近使用）
+    usage = usage_summary()
+    if usage:
+        shown_usage = {}
+        for rel, line in hits:
+            for card, u in usage.items():
+                if card.split('/')[-1] in rel or card.split('/')[-1] in line:
+                    shown_usage[card] = u
+        for card, u in sorted(shown_usage.items(), key=lambda x: -x[1].get('uses', 0))[:5]:
+            print(f'  [📊经验] {card}：引用{u.get("uses",0)}次·最近{u.get("last_used","?")}（用后记得 --record-use 回流）')
     if full:
         for rel, line in hits:
             print(f'  [{rel}] {line[:100]}')
