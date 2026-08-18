@@ -25,6 +25,11 @@ def search(root, kw, limit):
                             hits.append((rel, line.strip()[:90]))
             except:
                 pass
+    # 文件产出（xlsx/pdf等：文件名命中）
+    for ext in ('*.xlsx', '*.xls', '*.pdf', '*.csv'):
+        for f in glob.glob(os.path.join(root, '**', ext), recursive=True):
+            if kw.lower() in os.path.basename(f).lower():
+                hits.append((os.path.relpath(f, root), '[文件产出]'))
     # 捕捉箱
     inbox = os.path.join(root, '📥 捕捉箱.md')
     if os.path.exists(inbox):
