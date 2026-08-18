@@ -19,30 +19,44 @@ def load_state():
     return {}
 
 def scan(cfg):
+    """增量扫描：只列已处理清单（processed_files）之外的新项目"""
     new_items = []
     state = load_state()
+    processed = set(state.get('processed_files', []))
     for ai, src in cfg['sources'].items():
-        last = state.get(ai, 0)
         paths = src['path'] if isinstance(src['path'], list) else [src['path']]
         for base in paths:
             if not os.path.exists(base):
                 continue
             if src['type'] == 'sqlite':
-                mtime = os.path.getmtime(base)
-                if mtime > last:
-                    new_items.append({'ai': ai, 'source': base, 'type': 'sqlite', 'mtime': mtime})
+                fid = os.path.basename(base)
+                if fid not in processed:
+                    new_items.append({'ai': ai, 'source': base, 'type': 'sqlite'})
             elif src['type'] == 'jsonl_dir':
                 for f in glob.glob(os.path.join(base, '*', '*.jsonl')):
-                    mtime = os.path.getmtime(f)
-                    if mtime > last:
-                        new_items.append({'ai': ai, 'source': f, 'type': 'jsonl', 'mtime': mtime})
+                    fid = os.path.basename(f)
+                    if fid not in processed:
+                        new_items.append({'ai': ai, 'source': f, 'type': 'jsonl'})
             elif src['type'] == 'files':
                 for f in glob.glob(os.path.join(base, '*', '*')) + glob.glob(os.path.join(base, '*', '*', '*')):
                     if os.path.isfile(f):
-                        mtime = os.path.getmtime(f)
-                        if mtime > last:
-                            new_items.append({'ai': ai, 'source': f, 'type': 'file', 'mtime': mtime})
+                        fid = os.path.basename(f)
+                        if fid not in processed:
+                            new_items.append({'ai': ai, 'source': f, 'type': 'file'})
     return new_items, state
+
+
+def mark_processed(items):
+    """把已提炼的项目加入已处理清单（增量定位的核心）"""
+    state = load_state()
+    processed = set(state.get('processed_files', []))
+    for it in items:
+        processed.add(os.path.basename(it['source']))
+    state['processed_files'] = sorted(processed)
+    state['processed_count'] = len(processed)
+    with open(STATE_FILE, 'w', encoding='utf-8') as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
+    return state
 
 def auto_discover():
     """自动发现本机所有AI数据源（对照 knowledge/ai_sources.md 的已知位置）"""
@@ -103,15 +117,24 @@ def merge_sources(cfg):
 
 
 if __name__ == '__main__':
+    import sys
+    if '--mark' in sys.argv:
+        # 标记指定文件为已处理（用于提炼完成后）
+        items = [{'source': x} for x in sys.argv[sys.argv.index('--mark') + 1:]]
+        st = mark_processed(items)
+        print(f'已标记 {len(items)} 个文件为已处理，累计 {st["processed_count"]} 个')
+        sys.exit(0)
     cfg = load_config()
     sources = merge_sources(cfg)
     print('发现AI数据源:')
     for src in sources:
         print(f"  [{src['ai']}] {'(自动发现)' if src.get('auto') else '(手动配置)'} {src['path']}")
     items, state = scan({'sources': {src['ai']: {'type': src['type'], 'path': src['path']} for src in sources}})
-    print(f'扫描完成：新增 {len(items)} 个未处理项目')
+    print(f'扫描完成：新增 {len(items)} 个未处理项目（已处理 {state.get("processed_count", 0)} 个）')
     for it in items[:20]:
         print(f"  [{it['ai']}] {it['source']}")
     if len(items) > 20:
         print(f'  ...等共 {len(items)} 项')
+    if items:
+        print('  [提示] 提炼完成后运行 scripts/scan_ai_memories.py --mark <文件路径...> 标记已处理，下次自动跳过')
 
