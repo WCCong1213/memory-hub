@@ -1,0 +1,17 @@
+{
+  "memory_root": "D:\\第二大脑",
+  "auto_discover": true,
+  "sources": {},
+  "import_dir": "C:\\Users\\你的用户名\\导出对话",
+  "filters": {
+    "ignore_keywords": [
+      "鼠标",
+      "网盘",
+      "下载地址",
+      "韩元",
+      "剧场版",
+      "大模型"
+    ],
+    "privacy_mark": "🔒"
+  }
+}
