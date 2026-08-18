@@ -41,6 +41,13 @@ if __name__ == '__main__':
     cfg = load_cfg()
     hits = search(cfg['memory_root'], a.kw, a.limit)
     print(f'搜索「{a.kw}」命中 {len(hits)} 条：')
+    # 优先展示经验总索引命中（问题定位最快）
+    idx_path = os.path.join(cfg['memory_root'], '能力经验库', '📋 经验总索引.md')
+    if os.path.exists(idx_path):
+        idx_txt = open(idx_path, encoding='utf-8').read()
+        for line in idx_txt.split('\n'):
+            if a.kw in line and line.startswith('|'):
+                print(f'  [🎯经验索引] {line.strip()}')
     for rel, line in hits:
         print(f'  [{rel}] {line}')
     if not hits:
