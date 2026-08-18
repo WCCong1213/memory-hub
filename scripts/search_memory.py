@@ -2,7 +2,7 @@
 """记忆搜索：关键词搜索记忆库（项目库+能力库+AI记忆+捕捉箱）
 用法：python search_memory.py "关键词" [--ai AI名] [--limit N]
 """
-import argparse, json, os, glob
+import argparse, json, os, glob, sys
 
 def load_cfg():
     d = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -37,18 +37,30 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('kw')
     p.add_argument('--limit', type=int, default=15)
+    p.add_argument('--full', action='store_true', help='输出全部命中行')
     a = p.parse_args()
     cfg = load_cfg()
     hits = search(cfg['memory_root'], a.kw, a.limit)
-    print(f'搜索「{a.kw}」命中 {len(hits)} 条：')
-    # 优先展示经验总索引命中（问题定位最快）
+    full = '--full' in sys.argv
+    print(f'搜索「{a.kw}」：')
+    # 优先展示经验总索引命中（10秒定位，省token）
     idx_path = os.path.join(cfg['memory_root'], '能力经验库', '📋 经验总索引.md')
+    shown = 0
     if os.path.exists(idx_path):
         idx_txt = open(idx_path, encoding='utf-8').read()
         for line in idx_txt.split('\n'):
             if a.kw in line and line.startswith('|'):
-                print(f'  [🎯经验索引] {line.strip()}')
-    for rel, line in hits:
-        print(f'  [{rel}] {line}')
-    if not hits:
+                print(f'  [🎯索引] {line.strip()[:110]}')
+                shown += 1
+    if full:
+        for rel, line in hits:
+            print(f'  [{rel}] {line[:100]}')
+    elif not shown:
+        seen = set()
+        for rel, line in hits:
+            if rel not in seen:
+                seen.add(rel)
+                print(f'  [文件] {rel}')
+        print('  [提示] 加 --full 查看详细命中行')
+    if not hits and not shown:
         print('  （无命中——可检查捕捉箱或建议写入经验库）')
