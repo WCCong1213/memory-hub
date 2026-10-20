@@ -44,5 +44,24 @@
 | GLMCLI | `~\.glm-cli` | CLI会话 |
 | KimiCLI | `~\.kimi-cli` | CLI会话 |
 | MiniMax | `AppData\Local\MiniMax`、`Roaming\MiniMax` | 会话/配置 |
+| DeepSeekHarness | `~\.dsh\sessions\<工作区>\<会话ID>\session.jsonl.zstd` | **zstd压缩的JSONL**（文件头 28 B5 2F FD）|
 
 > 说明：各AI数据格式不同（sqlite/jsonl/LevelDB/文件产出），技能按格式自动解析；纯云端AI（网页版）需用户导出对话放 import_dir。
+
+## DeepSeek Harness（DSH）会话说明
+
+- **位置**：`~\.dsh\sessions\<工作区编码目录>\<会话ID>\session.jsonl.zstd`，按工作区归档（目录名是工作区路径的编码，如 `--F-2~0020~5DE5~5177-12-DeepSeek-Harness-~63D2~4EF6--` = `F:\2 工具\12-DeepSeek-Harness-插件`）
+- **格式**：Zstandard 多帧拼接的 JSONL（文件头魔数 `28 B5 2F FD`），每行一条事件（`user/message`、`assistant/message`、`tool/call`、`session/title` 等）
+- **解码方式（提炼前必须）**：用 Node 内置 zstd 解码，脚本 `F:\2 工具\12-DeepSeek-Harness-插件\decode-session.mjs`（零依赖）：
+  ```
+  node F:\2 工具\12-DeepSeek-Harness-插件\decode-session.mjs <会话文件路径>
+  ```
+  输出含类型分布 + 会话概览；用 `pwsh` 工具调用，无需给 Python 装 zstandard 库
+- **提炼要点**：DSH 会话里 `user/message` 是用户原话，`assistant/message` 是 AI 回复，`tool/call`+`tool/result` 是工具操作（可提炼出"怎么用 DSH 完成 X"的问题链）；按 `模板\会话笔记模板.md` 统一标准提炼
+- **导入目录**：`AI会话记忆\DeepSeekHarness\<项目名>\`（第二大脑已有此目录结构）
+
+## sqlite 单文件数据源说明（如 ZCode tasks-index.sqlite）
+
+- ZCode 等 sqlite 数据源是**单文件持续更新**（新会话写在同一个 sqlite 里），旧逻辑只认文件名 → 内容更新永远不会被当作"新增"
+- **修复**（2026-08-19）：扫描脚本用**指纹检测**（mtime+size）判断 sqlite 内容是否变化——指纹与上次记录不同 → 报新增；标记（--mark）时记录当前指纹，下次内容不变不再报
+- 指纹存于 `scripts/memory_hub_state.json` 的 `sqlite_fingerprints` 字段，无需人工干预

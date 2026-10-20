@@ -1,16 +1,28 @@
 {
-  "memory_root": "D:\\第二大脑",
+  "memory_root": "C:\\Users\\你的用户名\\第二大脑",
   "auto_discover": true,
-  "sources": {},
+  "sources": {
+    "ZCode": {
+      "type": "sqlite",
+      "path": "C:\\Users\\你的用户名\\.zcode\\v2\\tasks-index.sqlite"
+    },
+    "ClaudeCode": {
+      "type": "jsonl_dir",
+      "path": "C:\\Users\\你的用户名\\.claude\\projects"
+    },
+    "Doubao": {
+      "type": "files",
+      "path": [
+        "C:\\Users\\你的用户名\\Doubao\\chats"
+      ]
+    }
+  },
   "import_dir": "C:\\Users\\你的用户名\\导出对话",
   "filters": {
     "ignore_keywords": [
       "鼠标",
       "网盘",
-      "下载地址",
-      "韩元",
-      "剧场版",
-      "大模型"
+      "下载地址"
     ],
     "privacy_mark": "🔒"
   }

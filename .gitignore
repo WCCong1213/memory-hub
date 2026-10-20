@@ -1,7 +1,11 @@
 # 排除个人配置（含本机路径，不公开）
 config.json
 *.log
-# 状态文件与Python缓存（2026-10-15 起不提交）
+
+# 运行期状态：含已处理会话清单与本机路径，不公开
 scripts/memory_hub_state.json
+
+# Python 缓存与本地备份
 __pycache__/
 *.pyc
+*.bak-*
