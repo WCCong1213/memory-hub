@@ -37,7 +37,16 @@ def load_cfg():
     d = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return json.load(open(os.path.join(d, 'config.json'), encoding='utf-8'))
 
+def split_tokens(kw):
+    """多词支持：空格/中英文逗号/顿号/分号分隔，返回去空后的词列表"""
+    for sep in ('，', ',', '、', '；', ';'):
+        kw = kw.replace(sep, ' ')
+    return [t for t in kw.split() if t]
+
 def search(root, kw, limit):
+    toks = split_tokens(kw)
+    if not toks:
+        return []
     hits = []
     for base in ['项目经验库', '能力经验库', 'AI会话记忆']:
         bdir = os.path.join(root, base)
@@ -46,24 +55,29 @@ def search(root, kw, limit):
         for f in glob.glob(os.path.join(bdir, '**', '*.md'), recursive=True):
             try:
                 txt = open(f, encoding='utf-8', errors='ignore').read()
-                if kw in txt:
-                    # 提取命中行上下文
-                    for line in txt.split('\n'):
-                        if kw in line:
-                            rel = os.path.relpath(f, root)
-                            hits.append((rel, line.strip()[:90]))
+                # 文件级：所有词都要出现（多词=缩小范围，避免单字乱命中）
+                if not all(t in txt for t in toks):
+                    continue
+                rel = os.path.relpath(f, root)
+                # 优先取同一行包含全部词的行；没有则退化为任一词命中行
+                lines = [l.strip()[:90] for l in txt.split('\n') if all(t in l for t in toks)]
+                if not lines:
+                    lines = [l.strip()[:90] for l in txt.split('\n') if any(t in l for t in toks)]
+                for line in lines:
+                    hits.append((rel, line))
             except:
                 pass
     # 文件产出（xlsx/pdf等：文件名命中）
     for ext in ('*.xlsx', '*.xls', '*.pdf', '*.csv'):
         for f in glob.glob(os.path.join(root, '**', ext), recursive=True):
-            if kw.lower() in os.path.basename(f).lower():
+            name = os.path.basename(f).lower()
+            if all(t.lower() in name for t in toks):
                 hits.append((os.path.relpath(f, root), '[文件产出]'))
     # 捕捉箱
     inbox = os.path.join(root, '📥 捕捉箱.md')
     if os.path.exists(inbox):
         for line in open(inbox, encoding='utf-8', errors='ignore'):
-            if kw in line:
+            if all(t in line for t in toks):
                 hits.append(('📥 捕捉箱.md', line.strip()[:90]))
     return hits[:limit]
 
@@ -81,16 +95,18 @@ if __name__ == '__main__':
     cfg = load_cfg()
     hits = search(cfg['memory_root'], a.kw, a.limit)
     full = a.full
-    print(f'搜索「{a.kw}」：')
+    toks = split_tokens(a.kw)
+    hint = '（多词需同时出现）' if len(toks) > 1 else ''
+    print(f'搜索「{a.kw}」{hint}：')
     # 优先展示经验总索引命中（10秒定位，省token）
     idx_path = os.path.join(cfg['memory_root'], '能力经验库', '📋 经验总索引.md')
     shown = 0
-    if os.path.exists(idx_path):
-        idx_txt = open(idx_path, encoding='utf-8').read()
-        for line in idx_txt.split('\n'):
-            if a.kw in line and line.startswith('|'):
-                print(f'  [🎯索引] {line.strip()[:110]}')
-                shown += 1
+    if toks and os.path.exists(idx_path):
+        idx_rows = [l for l in open(idx_path, encoding='utf-8').read().split('\n') if l.startswith('|')]
+        picked = [l for l in idx_rows if all(t in l for t in toks)]
+        for line in picked[:8]:
+            print(f'  [🎯索引] {line.strip()[:110]}')
+            shown += 1
     # 展示命中经验卡的验证状态（应用闭环：引用次数+最近使用）
     usage = usage_summary()
     if usage:
